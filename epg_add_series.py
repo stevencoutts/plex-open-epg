@@ -94,13 +94,14 @@ def parse_season_episode(text: str) -> Optional[Tuple[int, int]]:
                     return s, e
             except Exception:
                 continue
-    # Leading X/Y at start of description, e.g. "27/30." → assume season 1, episode X
-    m2 = re.search(r"^\s*(?P<e>\d{1,3})\s*/\s*(?P<t>\d{1,3})\b", text)
+    # Leading X/Y at start of description, e.g. "27/30." → season X, episode Y
+    m2 = re.search(r"^\s*(?P<s>\d{1,3})\s*/\s*(?P<e>\d{1,3})\b", text)
     if m2:
         try:
+            s = int(m2.group("s"))
             e = int(m2.group("e"))
-            if e > 0:
-                return 1, e
+            if s > 0 and e > 0:
+                return s, e
         except Exception:
             pass
     return None
