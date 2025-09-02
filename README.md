@@ -1,6 +1,6 @@
 ## EPG Series Tagger
 
-Adds a `series` category to every `programme` in an XMLTV file and fills empty `xmltv_ns` episode numbers as `0.0.0`. This helps Plex DVR identify items as TV series when recording.
+Adds a `series` category to `programme` entries that have no categories and fills empty `xmltv_ns` episode numbers as `0.0.0`. This helps Plex DVR identify items as TV series when recording.
 
 ### Requirements
 - Python 3.8+
@@ -30,8 +30,9 @@ python3 epg_add_series.py --input /path/to/source.xml --output /path/to/open-epg
 ```
 
 ### What it does
-- Ensures every `programme` includes:
-  - `<category lang="en">series</category>` if missing
+- Ensures `programme` entries with no categories receive:
+  - `<category lang="en">series</category>`
+- Honours any existing categories and never overwrites them
 - Ensures empty `xmltv_ns` episode numbers are set to:
   - `<episode-num system="xmltv_ns">0.0.0</episode-num>`
 - Leaves existing non-empty `xmltv_ns` values unchanged

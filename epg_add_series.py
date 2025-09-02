@@ -50,13 +50,8 @@ def ensure_series_category(tree: ET.ElementTree) -> int:
     added_count = 0
     for programme in root.findall(f".//{programme_tag}"):
         categories = programme.findall(category_tag)
-        has_series = False
-        for cat in categories:
-            text = (cat.text or "").strip().lower()
-            if text == "series":
-                has_series = True
-                break
-        if not has_series:
+        # Only add 'series' if there are no existing category tags
+        if len(categories) == 0:
             new_cat = ET.Element(category_tag)
             new_cat.set("lang", "en")
             new_cat.text = "series"
