@@ -4,7 +4,7 @@ import sys
 import re
 import urllib.request
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 import xml.etree.ElementTree as ET
 
 
@@ -74,6 +74,66 @@ def ensure_xmltv_ns_episode_nums(tree: ET.ElementTree) -> int:
     return updated_count
 
 
+def parse_season_episode(text: str) -> Optional[Tuple[int, int]]:
+    # Look for common patterns like: S5 Ep2, S05E02, Season 5 Episode 2, Series 5 Ep 2
+    if not text:
+        return None
+    patterns = [
+        r"[Ss](?:eason)?\s*(?P<s>\d{1,3})\s*[,/ ]*\s*[Ee](?:p(?:isode)?)?\s*(?P<e>\d{1,3})",
+        r"[Ss]eries\s*(?P<s>\d{1,3})[^\d]{0,10}(?:[Ee](?:p(?:isode)?)?\s*)?(?P<e>\d{1,3})",
+        r"\bS\s*(?P<s>\d{1,3})\s*E\s*(?P<e>\d{1,3})\b",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, flags=re.IGNORECASE)
+        if m:
+            try:
+                s = int(m.group("s"))
+                e = int(m.group("e"))
+                if s > 0 and e > 0:
+                    return s, e
+            except Exception:
+                continue
+    return None
+
+
+def ensure_xmltv_ns_from_description(tree: ET.ElementTree) -> int:
+    root = tree.getroot()
+    programme_tag = tag_with_namespace(root.tag, "programme")
+    desc_tag = tag_with_namespace(root.tag, "desc")
+    episode_num_tag = tag_with_namespace(root.tag, "episode-num")
+
+    inferred_count = 0
+    for programme in root.findall(f".//{programme_tag}"):
+        # Find existing xmltv_ns episode-num
+        target_ep = None
+        for ep in programme.findall(episode_num_tag):
+            if (ep.get("system") or "").strip().lower() == "xmltv_ns":
+                target_ep = ep
+                break
+
+        # Use description text to infer S/E
+        desc_el = programme.find(desc_tag)
+        season_episode = parse_season_episode((desc_el.text or "") if desc_el is not None else "")
+        if season_episode is None:
+            continue
+
+        season, episode = season_episode
+        xmltv_ns_value = f"{season - 1}.{episode - 1}."
+
+        if target_ep is None:
+            target_ep = ET.Element(episode_num_tag)
+            target_ep.set("system", "xmltv_ns")
+            target_ep.text = xmltv_ns_value
+            programme.append(target_ep)
+            inferred_count += 1
+        else:
+            current_text = (target_ep.text or "").strip()
+            if current_text == "":
+                target_ep.text = xmltv_ns_value
+                inferred_count += 1
+    return inferred_count
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Download/modify XMLTV to ensure category 'series' on each programme")
     parser.add_argument("--url", help="Source URL to download XMLTV")
@@ -97,6 +157,7 @@ def main() -> int:
         return 1
 
     added_series = ensure_series_category(tree)
+    inferred_eps = ensure_xmltv_ns_from_description(tree)
     updated_eps = ensure_xmltv_ns_episode_nums(tree)
 
     try:
@@ -113,6 +174,7 @@ def main() -> int:
 
     print(
         f"Wrote {args.output} (added 'series' to {added_series} programme(s); "
+        f"inferred S/E from description on {inferred_eps} programme(s); "
         f"set xmltv_ns episode-num to 0.0.0 on {updated_eps} element(s))"
     )
     return 0
