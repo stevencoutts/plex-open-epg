@@ -21,7 +21,7 @@ Run with the default Open-EPG URL and write `open-epg_series.xml` in this direct
 ### Direct usage
 - Download from URL and write to a custom path:
 ```bash
-python3 epg_add_series.py --url "https://www.open-epg.com/app/pdownload.php?file=ksy5SdW4jS.xml" --output /path/to/open-epg_series.xml
+python3 epg_add_series.py --url "https://www.open-epg.com/app/pdownload.php?file=abc123456.xml" --output /path/to/open-epg_series.xml
 ```
 
 - Process a local XMLTV file:
