@@ -94,7 +94,31 @@ def parse_season_episode(text: str) -> Optional[Tuple[int, int]]:
                     return s, e
             except Exception:
                 continue
+    # Leading X/Y at start of description, e.g. "27/30." → assume season 1, episode X
+    m2 = re.search(r"^\s*(?P<e>\d{1,3})\s*/\s*(?P<t>\d{1,3})\b", text)
+    if m2:
+        try:
+            e = int(m2.group("e"))
+            if e > 0:
+                return 1, e
+        except Exception:
+            pass
     return None
+
+
+def _compute_date_based_xmltv_ns_for_programme(programme: ET.Element, episode_num_tag: str) -> Optional[str]:
+    start_attr = (programme.get("start") or "").strip()
+    if len(start_attr) < 8:
+        return None
+    try:
+        y = int(start_attr[0:4])
+        m = int(start_attr[4:6])
+        d = int(start_attr[6:8])
+        dt = datetime(y, m, d)
+        day_of_year = dt.timetuple().tm_yday
+        return f"{y - 1}.{day_of_year - 1}."
+    except Exception:
+        return None
 
 
 def ensure_xmltv_ns_from_description(tree: ET.ElementTree) -> int:
@@ -129,7 +153,9 @@ def ensure_xmltv_ns_from_description(tree: ET.ElementTree) -> int:
             inferred_count += 1
         else:
             current_text = (target_ep.text or "").strip()
-            if current_text == "":
+            # Allow overwrite if currently empty OR if it looks like our date-based fallback
+            date_fallback_value = _compute_date_based_xmltv_ns_for_programme(programme, episode_num_tag)
+            if current_text == "" or (date_fallback_value is not None and current_text == date_fallback_value):
                 target_ep.text = xmltv_ns_value
                 inferred_count += 1
     return inferred_count

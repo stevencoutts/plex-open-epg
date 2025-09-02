@@ -10,7 +10,7 @@ Enhances XMLTV data so Plex DVR recognises series and displays consistent season
 ### How episode numbers are determined (precedence)
 1. Keep existing non-empty `<episode-num system="xmltv_ns">…</episode-num>` as-is
 2. Else, parse season/episode from `<desc>` when it matches common patterns:
-   - `S5 Ep2`, `S05E02`, `Season 5 Episode 2`, `Series 5 Episode 2`
+   - `S5 Ep2`, `S05E02`, `Season 5 Episode 2`, `Series 5 Episode 2`, or leading `X/Y` (e.g., `27/30.` assumes season 1, episode 27)
    - Converted to zero-based `xmltv_ns` (e.g., `S5 Ep2` → `4.1.`)
 3. Else, date-based fallback from `programme@start` date:
    - season = start year, episode = day-of-year
@@ -72,6 +72,8 @@ python3 epg_add_series.py --input /path/to/source.xml --output /path/to/open-epg
 ### Examples
 - Description contains S/E:
   - `… S5 Ep2` ⇒ `xmltv_ns = 4.1.`
+- Description starts with `X/Y` (series count pattern):
+  - `27/30. …` ⇒ `xmltv_ns = 0.26.` (assumes season 1)
 - No S/E in description, `start="20250902140000 +0000"`:
   - season = 2025, episode = day‑of‑year(2025‑09‑02)=245 ⇒ `xmltv_ns = 2024.244.`
 
