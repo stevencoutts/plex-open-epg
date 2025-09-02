@@ -1,0 +1,4 @@
+# Exclude XML artifacts
+*.xml
+*.xml.gz
+
