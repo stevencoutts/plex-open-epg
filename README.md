@@ -8,15 +8,24 @@ Adds a `series` category to `programme` entries that have no categories and fill
 
 ### Files
 - `epg_add_series.py`: Core script. Downloads or reads XML, updates categories and episode numbers, writes output.
-- `run_epg_update.sh`: Convenience wrapper to run the script with the default Open-EPG URL.
+- `run_epg_update.sh`: Convenience wrapper that reads the source URL from `.env`.
 - `.gitignore`: Excludes `*.xml` artifacts from git.
 
+### Configuration (.env)
+Create a `.env` file in this directory with the source EPG URL:
+
+```bash
+EPG_SOURCE="https://www.open-epg.com/app/pdownload.php?file=ksy5SdW4jS.xml"
+```
+
 ### Quick start
-Run with the default Open-EPG URL and write `open-epg_series.xml` in this directory:
+Run with the URL from `.env` and write `open-epg_series.xml` in this directory:
 
 ```bash
 ./run_epg_update.sh
 ```
+
+If `EPG_SOURCE` is not set, the script will exit with an error explaining how to configure `.env`.
 
 ### Direct usage
 - Download from URL and write to a custom path:
