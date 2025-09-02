@@ -46,6 +46,7 @@ python3 epg_add_series.py --input /path/to/source.xml --output /path/to/open-epg
   - `<episode-num system="xmltv_ns">0.0.0</episode-num>`
 - Leaves existing non-empty `xmltv_ns` values unchanged
  - If description contains a recognizable pattern like `S5 Ep2`, `S05E02`, or `Season 5 Episode 2`, it writes an `xmltv_ns` value (zero-based, e.g., `S5 Ep2` → `4.1.`) when the `xmltv_ns` entry is missing or empty
+ - If no season/episode can be inferred, a date-based fallback sets `xmltv_ns` using programme start date as: season = start year, episode = day-of-year (both zero-based in xmltv_ns, e.g., 2025-09-02 → `2024.244.`)
 
 ### Cron example
 Run daily at 03:30, logging to `/var/log/epg_update.log`:

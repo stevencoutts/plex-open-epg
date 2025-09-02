@@ -3,6 +3,7 @@ import argparse
 import sys
 import re
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 import xml.etree.ElementTree as ET
@@ -134,6 +135,53 @@ def ensure_xmltv_ns_from_description(tree: ET.ElementTree) -> int:
     return inferred_count
 
 
+def ensure_xmltv_ns_from_date(tree: ET.ElementTree) -> int:
+    root = tree.getroot()
+    programme_tag = tag_with_namespace(root.tag, "programme")
+    episode_num_tag = tag_with_namespace(root.tag, "episode-num")
+
+    set_count = 0
+    for programme in root.findall(f".//{programme_tag}"):
+        start_attr = (programme.get("start") or "").strip()
+        if len(start_attr) < 8:
+            continue
+
+        # Check existing xmltv_ns state
+        target_ep = None
+        for ep in programme.findall(episode_num_tag):
+            if (ep.get("system") or "").strip().lower() == "xmltv_ns":
+                target_ep = ep
+                break
+
+        current_text = (target_ep.text or "").strip() if target_ep is not None else ""
+        if current_text:
+            # Already populated, skip
+            continue
+
+        # Parse date portion YYYYMMDD from start attr
+        try:
+            y = int(start_attr[0:4])
+            m = int(start_attr[4:6])
+            d = int(start_attr[6:8])
+            dt = datetime(y, m, d)
+            day_of_year = dt.timetuple().tm_yday
+        except Exception:
+            continue
+
+        xmltv_ns_value = f"{y - 1}.{day_of_year - 1}."
+
+        if target_ep is None:
+            target_ep = ET.Element(episode_num_tag)
+            target_ep.set("system", "xmltv_ns")
+            target_ep.text = xmltv_ns_value
+            programme.append(target_ep)
+            set_count += 1
+        else:
+            target_ep.text = xmltv_ns_value
+            set_count += 1
+    return set_count
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Download/modify XMLTV to ensure category 'series' on each programme")
     parser.add_argument("--url", help="Source URL to download XMLTV")
@@ -158,6 +206,7 @@ def main() -> int:
 
     added_series = ensure_series_category(tree)
     inferred_eps = ensure_xmltv_ns_from_description(tree)
+    date_fallback_eps = ensure_xmltv_ns_from_date(tree)
     updated_eps = ensure_xmltv_ns_episode_nums(tree)
 
     try:
@@ -175,6 +224,7 @@ def main() -> int:
     print(
         f"Wrote {args.output} (added 'series' to {added_series} programme(s); "
         f"inferred S/E from description on {inferred_eps} programme(s); "
+        f"date-based fallback applied on {date_fallback_eps} programme(s); "
         f"set xmltv_ns episode-num to 0.0.0 on {updated_eps} element(s))"
     )
     return 0
