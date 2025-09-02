@@ -1,33 +1,56 @@
-## EPG Series Tagger
+## EPG Series Enhancer
 
-Adds a `series` category to `programme` entries that have no categories, infers season/episode from description when possible, and fills empty `xmltv_ns` episode numbers as `0.0.0`. This helps Plex DVR identify items as TV series when recording.
+Enhances XMLTV data so Plex DVR recognises series and displays consistent season/episode numbers.
+
+### Features
+- Adds a `series` category to `programme` entries that have no categories
+- Fills missing `xmltv_ns` episode numbers using a strict precedence order
+- Pretty-prints and writes a clean XML file
+
+### How episode numbers are determined (precedence)
+1. Keep existing non-empty `<episode-num system="xmltv_ns">…</episode-num>` as-is
+2. Else, parse season/episode from `<desc>` when it matches common patterns:
+   - `S5 Ep2`, `S05E02`, `Season 5 Episode 2`, `Series 5 Episode 2`
+   - Converted to zero-based `xmltv_ns` (e.g., `S5 Ep2` → `4.1.`)
+3. Else, date-based fallback from `programme@start` date:
+   - season = start year, episode = day-of-year
+   - Stored zero-based in `xmltv_ns` (e.g., 2025‑09‑02 → `2024.244.`)
+4. Else, set any remaining empty `xmltv_ns` to `0.0.0`
+
+Notes:
+- Plex displays S/E using 1-based numbers, but `xmltv_ns` is zero-based. `4.1.` means S5 E2 in Plex.
+- Existing categories are never overwritten; `series` is only added if no categories exist.
 
 ### Requirements
 - Python 3.8+
 - macOS/Linux shell (or adjust commands for Windows)
 
-### Files
+### Repository layout
 - `epg_add_series.py`: Core script. Downloads or reads XML, updates categories and episode numbers, writes output.
-- `run_epg_update.sh`: Convenience wrapper that reads the source URL from `.env`.
-- `.gitignore`: Excludes `*.xml` artifacts from git.
+- `run_epg_update.sh`: Wrapper that reads the source URL from `.env` and runs the script.
+- `.gitignore`: Excludes `*.xml` artifacts and `.env` from git.
 
 ### Configuration (.env)
-Create a `.env` file in this directory with the source EPG URL:
+Create `.env` in this directory with your XMLTV source URL:
 
 ```bash
 EPG_SOURCE="https://www.open-epg.com/app/pdownload.php?file=ksy5SdW4jS.xml"
 ```
 
+Override per-run without editing `.env`:
+
+```bash
+EPG_SOURCE="https://example.com/feed.xml" ./run_epg_update.sh
+```
+
 ### Quick start
-Run with the URL from `.env` and write `open-epg_series.xml` in this directory:
+Generate `open-epg_series.xml` from the URL in `.env`:
 
 ```bash
 ./run_epg_update.sh
 ```
 
-If `EPG_SOURCE` is not set, the script will exit with an error explaining how to configure `.env`.
-
-### Direct usage
+### Direct usage (without the wrapper)
 - Download from URL and write to a custom path:
 ```bash
 python3 epg_add_series.py --url "https://www.open-epg.com/app/pdownload.php?file=abc123456.xml" --output /path/to/open-epg_series.xml
@@ -38,15 +61,19 @@ python3 epg_add_series.py --url "https://www.open-epg.com/app/pdownload.php?file
 python3 epg_add_series.py --input /path/to/source.xml --output /path/to/open-epg_series.xml
 ```
 
-### What it does
-- Ensures `programme` entries with no categories receive:
-  - `<category lang="en">series</category>`
-- Honours any existing categories and never overwrites them
-- Ensures empty `xmltv_ns` episode numbers are set to:
-  - `<episode-num system="xmltv_ns">0.0.0</episode-num>`
-- Leaves existing non-empty `xmltv_ns` values unchanged
- - If description contains a recognizable pattern like `S5 Ep2`, `S05E02`, or `Season 5 Episode 2`, it writes an `xmltv_ns` value (zero-based, e.g., `S5 Ep2` → `4.1.`) when the `xmltv_ns` entry is missing or empty
- - If no season/episode can be inferred, a date-based fallback sets `xmltv_ns` using programme start date as: season = start year, episode = day-of-year (both zero-based in xmltv_ns, e.g., 2025-09-02 → `2024.244.`)
+### What Plex shows
+- Title: from `<title>`
+- Episode title (details): from `<sub-title>` if present
+- Channel: from your Plex channel mapping
+- Time: converted from `start`/`stop` (UTC) to local time
+- Series detection: presence of `<category lang="en">series</category>`
+- S/E mapping: from `xmltv_ns` (Plex converts zero-based to 1-based)
+
+### Examples
+- Description contains S/E:
+  - `… S5 Ep2` ⇒ `xmltv_ns = 4.1.`
+- No S/E in description, `start="20250902140000 +0000"`:
+  - season = 2025, episode = day‑of‑year(2025‑09‑02)=245 ⇒ `xmltv_ns = 2024.244.`
 
 ### Cron example
 Run daily at 03:30, logging to `/var/log/epg_update.log`:
@@ -54,13 +81,12 @@ Run daily at 03:30, logging to `/var/log/epg_update.log`:
 30 3 * * * /Users/stevencoutts/Dev/EPG/run_epg_update.sh >/var/log/epg_update.log 2>&1
 ```
 
-### Notes
-- XML files are ignored by git via `.gitignore`.
-- A DOCTYPE (if present) is stripped before parsing to avoid external subset issues.
-- Output defaults to `open-epg_series.xml` in the working directory if `--output` is not specified.
-
 ### Troubleshooting
-- Network errors: check connectivity or try `--input` with a local file.
-- Parse errors: ensure the input is valid XMLTV. If issues persist, share a sample snippet.
+- Download errors: set `EPG_SOURCE` correctly or use `--input` with a local file
+- Parse errors: ensure the feed is valid XMLTV; share a sample snippet if issues persist
+- Unexpected S/E in Plex: Plex can also use other episode tags or online metadata; `xmltv_ns` is the most deterministic
 
+### Development
+- Run locally with a sample XML using `--input`
+- Keep changes small and readable; script is lint-clean
 
